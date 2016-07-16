@@ -29,10 +29,11 @@ esac
 shift
 done
 
+NJOBS=${NJOBS:-0}
 echo --------------------------------------------------------------
 echo DATASET = ${DATASET}
 echo PIPELINE_FILENAME = ${PIPELINE_FILENAME}
-echo NJOBS = ${NJOBS:-0}
+echo NJOBS = ${NJOBS} \(not used\)
 echo --------------------------------------------------------------
 if [[  -z "${DATASET}" ||  -z "${PIPELINE_FILENAME}" ]];
 then
@@ -89,7 +90,7 @@ fi
 mkdir -p $OUTPUT_DIR || exit 1
 mkdir -p $STATUS_DIR || exit 1
 
-parallel -j $NJOBS \
+parallel  \
     --no-run-if-empty \
     --delay 2 \
     --timeout 200% \
@@ -113,4 +114,3 @@ parallel -j $NJOBS \
     -t /tmp_dir \
     -g Metadata_Plate={1},Metadata_Well={2} \
     -d /status_dir/Plate_{1}_Well_{2}.txt
-
