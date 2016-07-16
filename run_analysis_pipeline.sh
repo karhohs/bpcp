@@ -1,42 +1,53 @@
 #!/bin/bash
 PROGNAME=`basename $0`
 
-# while [[ $# -gt 1 ]]
-# do
-# key="$1"
+while [[ $# -gt 1 ]]
+do
+key="$1"
 
-# case $key in
-#     -e|--extension)
-#     EXTENSION="$2"
-#     shift 
-#     ;;
-#     -s|--searchpath)
-#     SEARCHPATH="$2"
-#     shift 
-#     ;;
-#     -l|--lib)
-#     LIBPATH="$2"
-#     shift 
-#     ;;
-#     --default)
-#     DEFAULT=YES
-#     ;;
-#     *)
-#             # unknown option
-#     ;;
-# esac
-# shift 
-# done
+case $key in
+    -d|--dataset)
+    DATASET="$2"
+    shift
+    ;;
+    -p|--pipeline)
+    PIPELINE_FILENAME="$2"
+    shift
+    ;;
+    *)
+            # unknown option
+    ;;
+esac
+shift
+done
 
+echo --------------------------------------------------------------
+echo DATASET = ${DATASET}
+echo PIPELINE_FILENAME  = ${PIPELINE_FILENAME}
+echo --------------------------------------------------------------
+if [[  -z "${DATASET}" ||  -z "${PIPELINE_FILENAME}" ]];
+then
+    echo Variables not defined.
+    exit 1
+fi
 
+#DATASET='051816_3661_Q3Q4'
+#PIPELINE_FILENAME=analysis_AWS_stable_minimal.cppipe
 
 BASE_DIR='../..'
 CP_DOCKER_IMAGE=shntnu/cellprofiler
-DATASET='set_1'
 FILELIST_FILENAME=filelist.txt 
-PIPELINE_FILENAME=analysis_AWS_stable_minimal.cppipe
-PLATELIST_FILENAME=plateid_051816_3661_Q3Q4.txt
-WELLLIST_FILENAME=multiwellplate96.txt
+PLATELIST_FILENAME=platelist.txt
+WELLLIST_FILENAME=welllist.txt
+
+if [ ! -e $BASE_DIR ];
+then
+	echo $BASE_DIR not found
+	exit 1
+fi
+
+mkdir -p ${BASE_DIR}/analysis || exit 1
+mkdir -p ${BASE_DIR}/status || exit 1
 
 FILE_LIST_ABS_PATH=`readlink -e /home/ubuntu/bucket/`
 FILELIST_DIR=`readlink -e ${BASE_DIR}/filelist`/${DATASET}
@@ -51,27 +62,23 @@ STATUS_DIR=`readlink -e ${BASE_DIR}/status`/${DATASET}
 TMP_DIR="${TMP_DIR:-/tmp}"
 WELLLIST_FILE=`readlink -e ${METADATA_DIR}/${WELLLIST_FILENAME}`
 
+echo --------------------------------------------------------------
 echo FILELIST_FILE  = ${FILELIST_FILE}
 echo PIPELINE_FILE  = ${PIPELINE_FILE}
 echo PLATELIST_FILE = ${PLATELIST_FILE}
 echo WELLLIST_FILE  = ${WELLLIST_FILE}
+echo --------------------------------------------------------------
 
-if [ ! -e $BASE_DIR ];
-then
-	echo $BASE_DIR not found
-	exit 1
-fi
 
-if [ ! -z "${FILELIST_FILE}" || ! -z "${PIPELINE_FILE}" || ! -z "${PLATELIST_FILE}" || ! -z "${WELLLIST_FILE}" ]; 
+if [[  -z "${FILELIST_FILE}" ||  -z "${PIPELINE_FILE}" ||  -z "${PLATELIST_FILE}" ||  -z "${WELLLIST_FILE}" ]]; 
 then 
     echo Variables not defined.
     exit 1
 fi  
 
-mkdir -p $OUTPUT_DIR
-mkdir -p $STATUS_DIR
+mkdir -p $OUTPUT_DIR || exit 1
+mkdir -p $STATUS_DIR || exit 1
 
-echo \
 parallel -j 2 \
     --no-run-if-empty \
     --delay 2 \
@@ -82,6 +89,7 @@ parallel -j 2 \
     --joblog ${LOG_FILE} \
     -a ${PLATELIST_FILE} \
     -a ${WELLLIST_FILE} \
+    echo \
     docker run \
     --volume=${PIPELINE_DIR}:/pipeline_dir \
     --volume=${FILELIST_DIR}:/filelist_dir \
