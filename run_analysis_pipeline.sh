@@ -66,6 +66,7 @@ PLATELIST_FILENAME=platelist.txt
 WELLLIST_FILENAME=welllist.txt
 #------------------------------------------------------------------
 
+PIPELINE_DIR=`dirname ${PIPELINE_FILE}`
 BASE_DIR=`dirname $PIPELINE_DIR`
 
 mkdir -p ${BASE_DIR}/analysis || exit 1
@@ -78,7 +79,6 @@ FILELIST_FILE=${FILELIST_DIR}/${FILELIST_FILENAME}
 LOG_FILE=`mktemp /tmp/${PROGNAME}_XXXXXX` || exit 1
 METADATA_DIR=`readlink -e ${BASE_DIR}/metadata`/${DATASET}
 OUTPUT_DIR=`readlink -e ${BASE_DIR}/analysis`/${DATASET}
-PIPELINE_DIR=`dirname ${PIPELINE_FILE}`
 PIPELINE_FILENAME=`basename ${PIPELINE_FILE}`
 PLATELIST_FILE=`readlink -e ${METADATA_DIR}/${PLATELIST_FILENAME}`
 STATUS_DIR=`readlink -e ${BASE_DIR}/status`/${DATASET}
