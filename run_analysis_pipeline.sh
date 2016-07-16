@@ -1,72 +1,98 @@
 #!/bin/bash
+PROGNAME=`basename $0`
 
-programname=$0
+# while [[ $# -gt 1 ]]
+# do
+# key="$1"
 
-# function usage {
-#     echo "usage:$programname <plate-id> <group>"
-#     exit 1
-# }
+# case $key in
+#     -e|--extension)
+#     EXTENSION="$2"
+#     shift 
+#     ;;
+#     -s|--searchpath)
+#     SEARCHPATH="$2"
+#     shift 
+#     ;;
+#     -l|--lib)
+#     LIBPATH="$2"
+#     shift 
+#     ;;
+#     --default)
+#     DEFAULT=YES
+#     ;;
+#     *)
+#             # unknown option
+#     ;;
+# esac
+# shift 
+# done
 
-# if [ $# -ne 2 ]; then
-#     (>&2 echo "Incorrect number of arguments")
-#     exit
-# fi
 
-# plate_id=$1
-# group=$2
-# subdir=`echo $group| tr "," "_"|tr "=" "_"|sed "s/Metadata_//g"`
-# domain=`hostname -d`
 
-# project_dir=${HOME}/efs/2015_10_05_DrugRepurposing_AravindSubramanian_GolubLab_Broad/2016_04_01_a549_48hr_batch1
-# loaddata_dir=$project_dir/load_data_csv/$plate_id/
+BASE_DIR='../..'
+CP_DOCKER_IMAGE=shntnu/cellprofiler
+DATASET='set_1'
+FILELIST_FILENAME=filelist.txt 
+PIPELINE_FILENAME=analysis_AWS_stable_minimal.cppipe
+PLATELIST_FILENAME=plateid_051816_3661_Q3Q4.txt
+WELLLIST_FILENAME=multiwellplate96.txt
 
-# if [ ! -e $loaddata_csv ]; then
-#     (>&2 echo "$loaddata_csv does not exist. Exiting.")
-#     exit
-# fi
+FILE_LIST_ABS_PATH=`readlink -e /home/ubuntu/bucket/`
+FILELIST_DIR=`readlink -e ${BASE_DIR}/filelist`/${DATASET}
+FILELIST_FILE=${FILELIST_DIR}/${FILELIST_FILENAME} 
+LOG_FILE=`mktemp /tmp/${PROGNAME}_XXXXXX` || exit 1
+METADATA_DIR=`readlink -e ${BASE_DIR}/metadata`/${DATASET}
+OUTPUT_DIR=`readlink -e ${BASE_DIR}/analysis`/${DATASET}
+PIPELINE_DIR=`readlink -e ${BASE_DIR}/pipelines`
+PIPELINE_FILE=`readlink -e ${PIPELINE_DIR}/${PLATELIST_FILENAME}`
+PLATELIST_FILE=`readlink -e ${METADATA_DIR}/${PLATELIST_FILENAME}`
+STATUS_DIR=`readlink -e ${BASE_DIR}/status`/${DATASET}
+TMP_DIR="${TMP_DIR:-/tmp}"
+WELLLIST_FILE=`readlink -e ${METADATA_DIR}/${WELLLIST_FILENAME}`
 
-# pipeline_dir=$project_dir/pipelines/cellpainting_v2
-# output_dir=$project_dir/analysis/$plate_id
+function check_exist {
+	if [[ ! -f $1 || ! -d $1 ]]; then
+	    echo "$1 not found."
+	    exit 1
+	fi
+}
 
-# mkdir -p $output_dir
+echo \
+	${BASE_DIR} \
+	${FILE_LIST_ABS_PATH} \
+	${FILELIST_FILE} \
+	${PIPELINE_FILE} \
+	${PLATELIST_FILE} \
+	${WELLLIST_FILE} |
+xargs check_exist
 
-dataset='set_1'
-pipeline_dir=`readlink -e ../../../pipelines`
-filelist_dir=`readlink -e ../../../filelist`/${dataset}
-output_dir=`readlink -e ../../../analysis`/${dataset}
-done_dir=`readlink -e ../../../done`/${dataset}
-tmp_dir=/tmp
-mkdir -p $output_dir
-mkdir -p $done_dir
+mkdir -p $OUTPUT_DIR
+mkdir -p $STATUS_DIR
 
-pipeline_file=analysis_AWS_stable.cppipe
-group='Metadata_Plate=160519140001,Metadata_Well=A01'
-group_tag=`echo $group|tr ',=' '_'`
-plate_list='../../../metadata/plateid_051816_3661_Q3Q4.txt'
-well_list='../../../metadata/multiwellplate96.txt'
-
+echo \
 parallel -j 2 \
     --no-run-if-empty \
-    --delay .1 \
+    --delay 2 \
     --timeout 200% \
     --load 100% \
     --eta \
     --progress \
-    --joblog /tmp/cpbatch.log \
-    -a ${plate_list} \
-    -a ${well_list} \
+    --joblog ${LOG_FILE} \
+    -a ${PLATELIST_FILE} \
+    -a ${WELLLIST_FILE} \
     docker run \
-    --volume=${pipeline_dir}:/pipeline_dir \
-    --volume=${filelist_dir}:/filelist_dir \
-    --volume=${output_dir}:/output_dir \
-    --volume=${done_dir}:/done_dir \
-    --volume=${tmp_dir}:/tmp_dir \
-    --volume=/home/ubuntu/bucket/:/home/ubuntu/bucket \
-    shntnu/cellprofiler \
-    -p /pipeline_dir/${pipeline_file} \
-    --file-list=/filelist_dir/filelist.txt \
+    --volume=${PIPELINE_DIR}:/pipeline_dir \
+    --volume=${FILELIST_DIR}:/filelist_dir \
+    --volume=${OUTPUT_DIR}:/output_dir \
+    --volume=${STATUS_DIR}:/status_dir \
+    --volume=${TMP_DIR}:/tmp_dir \
+    --volume=${FILE_LIST_ABS_PATH}:${FILE_LIST_ABS_PATH} \
+    ${CP_DOCKER_IMAGE} \
+    -p /pipeline_dir/${PIPELINE_FILENAME} \
+    --file-list=/filelist_dir/${FILELIST_FILENAME} \
     -o /output_dir/ \
     -t /tmp_dir \
     -g Metadata_Plate={1},Metadata_Well={2} \
-    -d /done_dir/Plate_{1}_Well_{2}.txt
+    -d /status_dir/Plate_{1}_Well_{2}.txt
 
