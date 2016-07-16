@@ -50,7 +50,7 @@ fi
 
 if [[  -z `readlink -e ${PIPELINE_FILE}` ]];
 then
-    echo ${PIPELINE_FILE} not found.
+    echo PIPELINE_FILE ${PIPELINE_FILE} not found.
     exit 1
 fi
 PIPELINE_FILE=`readlink -e ${PIPELINE_FILE}`
