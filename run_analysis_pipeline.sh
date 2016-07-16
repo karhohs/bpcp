@@ -45,27 +45,18 @@ LOG_FILE=`mktemp /tmp/${PROGNAME}_XXXXXX` || exit 1
 METADATA_DIR=`readlink -e ${BASE_DIR}/metadata`/${DATASET}
 OUTPUT_DIR=`readlink -e ${BASE_DIR}/analysis`/${DATASET}
 PIPELINE_DIR=`readlink -e ${BASE_DIR}/pipelines`
-PIPELINE_FILE=`readlink -e ${PIPELINE_DIR}/${PLATELIST_FILENAME}`
+PIPELINE_FILE=`readlink -e ${PIPELINE_DIR}/${PIPELINE_FILENAME}`
 PLATELIST_FILE=`readlink -e ${METADATA_DIR}/${PLATELIST_FILENAME}`
 STATUS_DIR=`readlink -e ${BASE_DIR}/status`/${DATASET}
 TMP_DIR="${TMP_DIR:-/tmp}"
 WELLLIST_FILE=`readlink -e ${METADATA_DIR}/${WELLLIST_FILENAME}`
 
-function check_exist {
-	if [[ ! -f $1 || ! -d $1 ]]; then
-	    echo "$1 not found."
-	    exit 1
-	fi
-}
+if [ ! -z "${FILELIST_FILE}" || ! -z "${PIPELINE_FILE}" || ! -z "${PLATELIST_FILE}" || ! -z "${WELLLIST_FILE}" ]; 
+then 
+    echo Variables not defined.
+    exit 1
+fi  
 
-echo \
-	${BASE_DIR} \
-	${FILE_LIST_ABS_PATH} \
-	${FILELIST_FILE} \
-	${PIPELINE_FILE} \
-	${PLATELIST_FILE} \
-	${WELLLIST_FILE} |
-xargs check_exist
 
 mkdir -p $OUTPUT_DIR
 mkdir -p $STATUS_DIR
