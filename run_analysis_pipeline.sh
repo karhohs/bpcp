@@ -22,6 +22,10 @@ case $key in
     NJOBS="$2"
     shift
     ;;
+    -t|--tmpdir)
+    TMP_DIR="$2"
+    shift
+    ;;
     *)
             # unknown option
     ;;
@@ -30,10 +34,12 @@ shift
 done
 
 NJOBS=${NJOBS:-0}
+TMP_DIR="${TMP_DIR:-/tmp}"
 echo --------------------------------------------------------------
 echo DATASET = ${DATASET}
 echo PIPELINE_FILENAME = ${PIPELINE_FILENAME}
 echo NJOBS = ${NJOBS} \(not used\)
+echo TMP_DIR = ${TMP_DIR}
 echo --------------------------------------------------------------
 if [[  -z "${DATASET}" ||  -z "${PIPELINE_FILENAME}" ]];
 then
@@ -69,7 +75,6 @@ PIPELINE_DIR=`readlink -e ${BASE_DIR}/pipelines`
 PIPELINE_FILE=`readlink -e ${PIPELINE_DIR}/${PIPELINE_FILENAME}`
 PLATELIST_FILE=`readlink -e ${METADATA_DIR}/${PLATELIST_FILENAME}`
 STATUS_DIR=`readlink -e ${BASE_DIR}/status`/${DATASET}
-TMP_DIR="${TMP_DIR:-/tmp}"
 WELLLIST_FILE=`readlink -e ${METADATA_DIR}/${WELLLIST_FILENAME}`
 
 echo --------------------------------------------------------------
