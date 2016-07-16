@@ -1,4 +1,8 @@
 #!/bin/bash
+
+# Before launching, figure out memory requirements of your pipeline
+# valgrind --tool=massif --depth=1 --trace-children=yes <cmd>
+
 PROGNAME=`basename $0`
 
 while [[ $# -gt 1 ]]
@@ -14,9 +18,8 @@ case $key in
     PIPELINE_FILENAME="$2"
     shift
     ;;
-    -m)
-    # not used
-    MEMORY_PER_INSTANCE="$2"
+    -j)
+    NJOBS="$2"
     shift
     ;;
     *)
@@ -29,6 +32,7 @@ done
 echo --------------------------------------------------------------
 echo DATASET = ${DATASET}
 echo PIPELINE_FILENAME = ${PIPELINE_FILENAME}
+echo NJOBS = ${NJOBS:-0}
 echo --------------------------------------------------------------
 if [[  -z "${DATASET}" ||  -z "${PIPELINE_FILENAME}" ]];
 then
@@ -72,6 +76,7 @@ echo FILELIST_FILE  = ${FILELIST_FILE}
 echo PIPELINE_FILE  = ${PIPELINE_FILE}
 echo PLATELIST_FILE = ${PLATELIST_FILE}
 echo WELLLIST_FILE  = ${WELLLIST_FILE}
+echo LOG_FILE       = ${LOG_FILE}
 echo --------------------------------------------------------------
 
 
@@ -84,7 +89,7 @@ fi
 mkdir -p $OUTPUT_DIR || exit 1
 mkdir -p $STATUS_DIR || exit 1
 
-parallel -j 2 \
+parallel -j $NJOBS \
     --no-run-if-empty \
     --delay 2 \
     --timeout 200% \
