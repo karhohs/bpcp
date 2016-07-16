@@ -75,7 +75,7 @@ mkdir -p ${BASE_DIR}/status || exit 1
 
 FILE_LIST_ABS_PATH=`readlink -e /home/ubuntu/bucket/`
 FILELIST_DIR=`readlink -e ${BASE_DIR}/filelist`/${DATASET}
-FILELIST_FILE=${FILELIST_DIR}/${FILELIST_FILENAME} 
+FILELIST_FILE=`readlink -e ${FILELIST_DIR}/${FILELIST_FILENAME}`
 LOG_FILE=`mktemp /tmp/${PROGNAME}_XXXXXX` || exit 1
 METADATA_DIR=`readlink -e ${BASE_DIR}/metadata`/${DATASET}
 OUTPUT_DIR=`readlink -e ${BASE_DIR}/analysis`/${DATASET}
