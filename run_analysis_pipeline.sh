@@ -37,16 +37,13 @@ done
 NJOBS=${NJOBS:-0}
 TMP_DIR="${TMP_DIR:-/tmp}"
 PIPELINE_FILE=`readlink -e ${PIPELINE_FILE}`
-PIPELINE_DIR=`dirname ${PIPELINE_FILE}`
-BASE_DIR=`dirname $PIPELINE_DIR`
 echo --------------------------------------------------------------
-echo BASE_DIR      = ${BASE_DIR}
 echo DATASET       = ${DATASET}
-echo PIPELINE_FILE = ${PIPELINE_FILE}
 echo NJOBS         = ${NJOBS} \(not used\)
+echo PIPELINE_FILE = ${PIPELINE_FILE}
 echo TMP_DIR       = ${TMP_DIR}
 echo --------------------------------------------------------------
-if [[  -z "${DATASET}" ||  -z "${PIPELINE_FILE}"  || -z "${BASE_DIR}" ]];
+if [[  -z "${DATASET}" ||  -z "${PIPELINE_FILE}"  ||  -z "${TMP_DIR}" ]];
 then
     echo Variables not defined.
     exit 1
@@ -55,19 +52,18 @@ fi
 #DATASET='051816_3661_Q3Q4'
 #PIPELINE_FILE=../../pipelines/analysis_AWS_stable_minimal.cppipe
 
+#------------------------------------------------------------------
 CP_DOCKER_IMAGE=shntnu/cellprofiler
 FILELIST_FILENAME=filelist.txt 
 PLATELIST_FILENAME=platelist.txt
 WELLLIST_FILENAME=welllist.txt
+#------------------------------------------------------------------
 
-if [ ! -e $BASE_DIR ];
-then
-	echo $BASE_DIR not found
-	exit 1
-fi
+BASE_DIR=`dirname $PIPELINE_DIR`
 
 mkdir -p ${BASE_DIR}/analysis || exit 1
 mkdir -p ${BASE_DIR}/status || exit 1
+
 
 FILE_LIST_ABS_PATH=`readlink -e /home/ubuntu/bucket/`
 FILELIST_DIR=`readlink -e ${BASE_DIR}/filelist`/${DATASET}
@@ -75,6 +71,7 @@ FILELIST_FILE=${FILELIST_DIR}/${FILELIST_FILENAME}
 LOG_FILE=`mktemp /tmp/${PROGNAME}_XXXXXX` || exit 1
 METADATA_DIR=`readlink -e ${BASE_DIR}/metadata`/${DATASET}
 OUTPUT_DIR=`readlink -e ${BASE_DIR}/analysis`/${DATASET}
+PIPELINE_DIR=`dirname ${PIPELINE_FILE}`
 PIPELINE_FILENAME=`basename ${PIPELINE_FILE}`
 PLATELIST_FILE=`readlink -e ${METADATA_DIR}/${PLATELIST_FILENAME}`
 STATUS_DIR=`readlink -e ${BASE_DIR}/status`/${DATASET}
@@ -82,14 +79,13 @@ WELLLIST_FILE=`readlink -e ${METADATA_DIR}/${WELLLIST_FILENAME}`
 
 echo --------------------------------------------------------------
 echo FILELIST_FILE  = ${FILELIST_FILE}
-echo PIPELINE_FILE  = ${PIPELINE_FILE}
 echo PLATELIST_FILE = ${PLATELIST_FILE}
 echo WELLLIST_FILE  = ${WELLLIST_FILE}
 echo LOG_FILE       = ${LOG_FILE}
 echo --------------------------------------------------------------
 
 
-if [[  -z "${FILELIST_FILE}" ||  -z "${PIPELINE_FILE}" ||  -z "${PLATELIST_FILE}" ||  -z "${WELLLIST_FILE}" ]]; 
+if [[  -z "${FILELIST_FILE}" ||  -z "${PLATELIST_FILE}" ||  -z "${WELLLIST_FILE}" ]]; 
 then 
     echo Variables not defined.
     exit 1
