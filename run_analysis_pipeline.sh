@@ -14,6 +14,11 @@ case $key in
     PIPELINE_FILENAME="$2"
     shift
     ;;
+    -m)
+    # not used
+    MEMORY_PER_INSTANCE="$2"
+    shift
+    ;;
     *)
             # unknown option
     ;;
@@ -23,7 +28,7 @@ done
 
 echo --------------------------------------------------------------
 echo DATASET = ${DATASET}
-echo PIPELINE_FILENAME  = ${PIPELINE_FILENAME}
+echo PIPELINE_FILENAME = ${PIPELINE_FILENAME}
 echo --------------------------------------------------------------
 if [[  -z "${DATASET}" ||  -z "${PIPELINE_FILENAME}" ]];
 then
