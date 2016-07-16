@@ -34,13 +34,6 @@ esac
 shift
 done
 
-if [[  -z `readlink -e ${PIPELINE_FILE}` ]];
-then
-    echo ${PIPELINE_FILE} not found.
-    exit 1
-fi
-PIPELINE_FILE=`readlink -e ${PIPELINE_FILE}`
-
 NJOBS=${NJOBS:-0}
 TMP_DIR="${TMP_DIR:-/tmp}"
 echo --------------------------------------------------------------
@@ -54,6 +47,13 @@ then
     echo Variables not defined.
     exit 1
 fi
+
+if [[  -z `readlink -e ${PIPELINE_FILE}` ]];
+then
+    echo ${PIPELINE_FILE} not found.
+    exit 1
+fi
+PIPELINE_FILE=`readlink -e ${PIPELINE_FILE}`
 
 
 #DATASET='051816_3661_Q3Q4'
