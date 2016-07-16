@@ -51,12 +51,22 @@ STATUS_DIR=`readlink -e ${BASE_DIR}/status`/${DATASET}
 TMP_DIR="${TMP_DIR:-/tmp}"
 WELLLIST_FILE=`readlink -e ${METADATA_DIR}/${WELLLIST_FILENAME}`
 
+echo FILELIST_FILE  = ${FILELIST_FILE}
+echo PIPELINE_FILE  = ${PIPELINE_FILE}
+echo PLATELIST_FILE = ${PLATELIST_FILE}
+echo WELLLIST_FILE  = ${WELLLIST_FILE}
+
+if [ ! -e $BASE_DIR ];
+then
+	echo $BASE_DIR not found
+	exit 1
+fi
+
 if [ ! -z "${FILELIST_FILE}" || ! -z "${PIPELINE_FILE}" || ! -z "${PLATELIST_FILE}" || ! -z "${WELLLIST_FILE}" ]; 
 then 
     echo Variables not defined.
     exit 1
 fi  
-
 
 mkdir -p $OUTPUT_DIR
 mkdir -p $STATUS_DIR
