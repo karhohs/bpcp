@@ -15,11 +15,12 @@ case $key in
     shift
     ;;
     -p|--pipeline)
-    PIPELINE_FILENAME="$2"
+    PIPELINE_FILE="$2"
     shift
     ;;
     -j)
     NJOBS="$2"
+    # not used
     shift
     ;;
     -t|--tmpdir)
@@ -35,22 +36,25 @@ done
 
 NJOBS=${NJOBS:-0}
 TMP_DIR="${TMP_DIR:-/tmp}"
+PIPELINE_FILE=`readlink -e ${PIPELINE_FILE}`
+PIPELINE_DIR=`dirname ${PIPELINE_FILE}`
+BASE_DIR=`dirname $PIPELINE_DIR`
 echo --------------------------------------------------------------
-echo DATASET = ${DATASET}
-echo PIPELINE_FILENAME = ${PIPELINE_FILENAME}
-echo NJOBS = ${NJOBS} \(not used\)
-echo TMP_DIR = ${TMP_DIR}
+echo BASE_DIR      = ${BASE_DIR}
+echo DATASET       = ${DATASET}
+echo PIPELINE_FILE = ${PIPELINE_FILE}
+echo NJOBS         = ${NJOBS} \(not used\)
+echo TMP_DIR       = ${TMP_DIR}
 echo --------------------------------------------------------------
-if [[  -z "${DATASET}" ||  -z "${PIPELINE_FILENAME}" ]];
+if [[  -z "${DATASET}" ||  -z "${PIPELINE_FILE}"  || -z "${BASE_DIR}" ]];
 then
     echo Variables not defined.
     exit 1
 fi
 
 #DATASET='051816_3661_Q3Q4'
-#PIPELINE_FILENAME=analysis_AWS_stable_minimal.cppipe
+#PIPELINE_FILE=../../pipelines/analysis_AWS_stable_minimal.cppipe
 
-BASE_DIR='../..'
 CP_DOCKER_IMAGE=shntnu/cellprofiler
 FILELIST_FILENAME=filelist.txt 
 PLATELIST_FILENAME=platelist.txt
@@ -71,8 +75,7 @@ FILELIST_FILE=${FILELIST_DIR}/${FILELIST_FILENAME}
 LOG_FILE=`mktemp /tmp/${PROGNAME}_XXXXXX` || exit 1
 METADATA_DIR=`readlink -e ${BASE_DIR}/metadata`/${DATASET}
 OUTPUT_DIR=`readlink -e ${BASE_DIR}/analysis`/${DATASET}
-PIPELINE_DIR=`readlink -e ${BASE_DIR}/pipelines`
-PIPELINE_FILE=`readlink -e ${PIPELINE_DIR}/${PIPELINE_FILENAME}`
+PIPELINE_FILENAME=`basename ${PIPELINE_FILE}`
 PLATELIST_FILE=`readlink -e ${METADATA_DIR}/${PLATELIST_FILENAME}`
 STATUS_DIR=`readlink -e ${BASE_DIR}/status`/${DATASET}
 WELLLIST_FILE=`readlink -e ${METADATA_DIR}/${WELLLIST_FILENAME}`
@@ -95,6 +98,7 @@ fi
 mkdir -p $OUTPUT_DIR || exit 1
 mkdir -p $STATUS_DIR || exit 1
 
+echo \
 parallel  \
     --no-run-if-empty \
     --delay 2 \
