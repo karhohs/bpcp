@@ -109,6 +109,7 @@ parallel  \
     --load 100% \
     --eta \
     --progress \
+    --rm \
     --joblog ${LOG_FILE} \
     -a ${PLATELIST_FILE} \
     -a ${WELLLIST_FILE} \
