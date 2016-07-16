@@ -94,7 +94,6 @@ parallel -j 2 \
     --joblog ${LOG_FILE} \
     -a ${PLATELIST_FILE} \
     -a ${WELLLIST_FILE} \
-    echo \
     docker run \
     --volume=${PIPELINE_DIR}:/pipeline_dir \
     --volume=${FILELIST_DIR}:/filelist_dir \
