@@ -104,7 +104,8 @@ mkdir -p $STATUS_DIR || exit 1
 
 # Create a log group:
 # Requirements: 
-# - sudo apt-get install python-pip
+# - sudo apt-get install parallel -y
+# - sudo apt-get install python-pip -y
 # - pip install awscli
 # Configure AWS:
 # - aws configure 
@@ -125,20 +126,18 @@ comm -23 \
 <(parallel -a ${PLATELIST_FILE} -a ${WELLLIST_FILE} echo {1} {2}|sort) \
 <(parallel basename {} ::: `grep -l Complete ${STATUS_DIR}/*.txt`|cut -d"_" -f 2,4|cut -d"." -f1|tr '_' ' '|sort)  > ${SETS_FILE}
 
-echo \
 parallel  \
     --no-run-if-empty \
-    --delay 2 \
+    --delay .1 \
     --timeout 200% \
     --load 100% \
     --eta \
     --progress \
-    --rm \
     --joblog ${LOG_FILE} \
     -a ${SETS_FILE} \
     --colsep ' ' \
     docker run \
-    --entrypoint=cellprofiler -c -r -b \
+    --rm \
     --volume=${PIPELINE_DIR}:/pipeline_dir \
     --volume=${FILELIST_DIR}:/filelist_dir \
     --volume=${OUTPUT_DIR}:/output_dir \
