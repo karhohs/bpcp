@@ -122,20 +122,22 @@ fi;
 
 SETS_FILE=${LOG_DIR}/sets.txt
 
-comm -23 \
-<(parallel -a ${PLATELIST_FILE} -a ${WELLLIST_FILE} echo {1} {2}|sort) \
-<(parallel basename {} ::: `grep -l Complete ${STATUS_DIR}/*.txt`|cut -d"_" -f 2,4|cut -d"." -f1|tr '_' ' '|sort)  > ${SETS_FILE}
+parallel -a ${PLATELIST_FILE} -a ${WELLLIST_FILE} echo {1} {2}|sort > ${SETS_FILE}.1
+find ${STATUS_DIR} -name "*.txt" | xargs grep -l Complete |xargs -n 1 basename|cut -d"_" -f 2,4|cut -d"." -f1|tr '_' ' '|sort > ${SETS_FILE}.2
+#comm -23 ${SETS_FILE}.1 ${SETS_FILE}.2 |tr ' ' '\t' |head -n 3 > ${SETS_FILE}
+comm -23 ${SETS_FILE}.1 ${SETS_FILE}.2 |tr ' ' '\t' > ${SETS_FILE}
 
 parallel  \
     --no-run-if-empty \
     --delay .1 \
+    --max-procs -1 \
     --timeout 200% \
     --load 100% \
     --eta \
     --progress \
     --joblog ${LOG_FILE} \
     -a ${SETS_FILE} \
-    --colsep ' ' \
+    --colsep '\t' \
     docker run \
     --rm \
     --volume=${PIPELINE_DIR}:/pipeline_dir \
