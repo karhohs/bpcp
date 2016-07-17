@@ -133,6 +133,7 @@ parallel  \
     --load 100% \
     --eta \
     --progress \
+    --rm \
     --joblog ${LOG_FILE} \
     -a ${SETS_FILE} \
     --colsep ' ' \
