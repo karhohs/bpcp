@@ -56,8 +56,6 @@ done
 PIPELINE_FILE=`readlink -e ${PIPELINE_FILE}`
 FILE_LIST_ABS_PATH=`readlink -e ${FILE_LIST_ABS_PATH}`
 
-exit 1
-
 #------------------------------------------------------------------
 CP_DOCKER_IMAGE=shntnu/cellprofiler
 FILELIST_FILENAME=filelist.txt 
@@ -82,7 +80,7 @@ STATUS_DIR=`readlink -e ${BASE_DIR}/status`/${DATASET}/
 LOG_DIR=`readlink -e ${BASE_DIR}/log`/${DATASET}
 mkdir -p $LOG_DIR || exit 1
 DATE=$(date +"%Y%m%d%H%M%S")
-LOG_FILE=`mktemp --tmpdir=${LOG_DIR} ${PROGNAME}_${DATE}_XXXXXX` || exit 1
+LOG_FILE=`mktemp --tmpdir=${LOG_DIR} ${PROGNAME}_${DATASET}_${DATE}_XXXXXX` || exit 1
 WELLLIST_FILE=`readlink -e ${METADATA_DIR}/${WELLLIST_FILENAME}`
 
 echo --------------------------------------------------------------
@@ -92,22 +90,17 @@ echo WELLLIST_FILE  = ${WELLLIST_FILE}
 echo LOG_FILE       = ${LOG_FILE}
 echo --------------------------------------------------------------
 
-if [[  -z "${FILELIST_FILE}" ||  -z "${PLATELIST_FILE}" ||  -z "${WELLLIST_FILE}" ]]; 
-then 
-    echo Variables not defined.
-    exit 1
-fi  
+for var in FILELIST_FILE PLATELIST_FILE WELLLIST_FILE;
+do 
+    if [[  -z "${!var}"  ]];
+    then
+        echo ${var} not defined.
+        exit 1
+    fi
+done
 
 mkdir -p $OUTPUT_DIR || exit 1
 mkdir -p $STATUS_DIR || exit 1
-
-# Create a log group:
-# Requirements: 
-# - sudo apt-get install parallel -y
-# - sudo apt-get install python-pip -y
-# - pip install awscli
-# Configure AWS:
-# - aws configure 
 
 type aws >/dev/null 2>&1 || { echo >&2 "aws-cli not installed.  Aborting."; exit 1; }
 
