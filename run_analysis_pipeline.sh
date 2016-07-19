@@ -1,5 +1,6 @@
 #!/bin/bash
 
+PROGNAME=`basename $0`
 
 while [[ $# -gt 1 ]]
 do
@@ -114,8 +115,16 @@ fi;
 
 SETS_FILE=${LOG_DIR}/sets.txt
 
-parallel -a ${PLATELIST_FILE} -a ${WELLLIST_FILE} echo {1} {2}|sort > ${SETS_FILE}.1
-find ${STATUS_DIR} -name "*.txt" | xargs grep -l Complete |xargs -n 1 basename|cut -d"_" -f 2,4|cut -d"." -f1|tr '_' ' '|sort > ${SETS_FILE}.2
+parallel --no-run-if-empty -a ${PLATELIST_FILE} -a ${WELLLIST_FILE} echo {1} {2}|sort > ${SETS_FILE}.1
+
+if [[ `find ${STATUS_DIR} -name "*.txt"|wc -l` -eq 0 ]];
+then
+    rm ${SETS_FILE}.2
+    touch ${SETS_FILE}.2
+else
+    find ${STATUS_DIR} -name "*.txt" | xargs grep -l Complete |xargs -n 1 basename|cut -d"_" -f 2,4|cut -d"." -f1|tr '_' ' '|sort > ${SETS_FILE}.2
+fi
+
 #comm -23 ${SETS_FILE}.1 ${SETS_FILE}.2 |tr ' ' '\t' |head -n 3 > ${SETS_FILE}
 comm -23 ${SETS_FILE}.1 ${SETS_FILE}.2 |tr ' ' '\t' > ${SETS_FILE}
 
