@@ -1,9 +1,5 @@
 #!/bin/bash
 
-# Before launching, figure out memory requirements of your pipeline
-# valgrind --tool=massif --depth=1 --trace-children=yes <cmd>
-
-PROGNAME=`basename $0`
 
 while [[ $# -gt 1 ]]
 do
@@ -18,45 +14,49 @@ case $key in
     PIPELINE_FILE="$2"
     shift
     ;;
-    -j)
-    NJOBS="$2"
-    # not used
-    shift
-    ;;
     -t|--tmpdir)
     TMP_DIR="$2"
     shift
     ;;
     *)
-            # unknown option
+    # unknown option
     ;;
 esac
 shift
 done
 
-NJOBS=${NJOBS:-0}
 TMP_DIR="${TMP_DIR:-/tmp}"
-echo --------------------------------------------------------------
-echo DATASET       = ${DATASET}
-echo NJOBS         = ${NJOBS} \(not used\)
-echo PIPELINE_FILE = ${PIPELINE_FILE}
-echo TMP_DIR       = ${TMP_DIR}
-echo --------------------------------------------------------------
-if [[  -z "${DATASET}" ||  -z "${PIPELINE_FILE}"  ||  -z "${TMP_DIR}" ]];
-then
-    echo Variables not defined.
-    exit 1
-fi
+FILE_LIST_ABS_PATH="${FILE_LIST_ABS_PATH:-/home/ubuntu/bucket/}"
 
-if [[  -z `readlink -e ${PIPELINE_FILE}` ]];
-then
-    echo PIPELINE_FILE ${PIPELINE_FILE} not found.
-    exit 1
-fi
+echo --------------------------------------------------------------
+echo DATASET            = ${DATASET}
+echo PIPELINE_FILE      = ${PIPELINE_FILE}
+echo TMP_DIR            = ${TMP_DIR}
+echo FILE_LIST_ABS_PATH = ${FILE_LIST_ABS_PATH}
+echo --------------------------------------------------------------
+
+for var in DATASET PIPELINE_FILE TMP_DIR;
+do 
+    if [[  -z "${!var}"  ]];
+    then
+        echo ${var} not defined.
+        exit 1
+    fi
+done
+
+for var in PIPELINE_FILE FILE_LIST_ABS_PATH;
+do 
+    if [[  -z `readlink -e ${!var}` ]];
+    then
+        echo ${var}=${!var} not found.
+        exit 1
+    fi
+done
+
 PIPELINE_FILE=`readlink -e ${PIPELINE_FILE}`
+FILE_LIST_ABS_PATH=`readlink -e ${FILE_LIST_ABS_PATH}`
 
-#DATASET='051816_3661_Q3Q4'
-#PIPELINE_FILE=../../pipelines/analysis_AWS_stable_minimal.cppipe
+exit 1
 
 #------------------------------------------------------------------
 CP_DOCKER_IMAGE=shntnu/cellprofiler
@@ -72,7 +72,6 @@ mkdir -p ${BASE_DIR}/analysis || exit 1
 mkdir -p ${BASE_DIR}/log || exit 1
 mkdir -p ${BASE_DIR}/status || exit 1
 
-FILE_LIST_ABS_PATH=`readlink -e /home/ubuntu/bucket/`
 FILELIST_DIR=`readlink -e ${BASE_DIR}/filelist`/${DATASET}
 FILELIST_FILE=`readlink -e ${FILELIST_DIR}/${FILELIST_FILENAME}`
 METADATA_DIR=`readlink -e ${BASE_DIR}/metadata`/${DATASET}
