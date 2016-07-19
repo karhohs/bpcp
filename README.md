@@ -11,4 +11,8 @@ Script to batch process images using CellProfiler and GNU parallel
  - `aws configure`
 - Before launching, figure out memory requirements of your pipeline
  - `valgrind --tool=massif --depth=1 --trace-children=yes <cmd>`
-
+- To create RAM disk
+ - `echo mkdir /mnt/ramdisk`
+ - `echo sudo mount -t tmpfs -o size=24576m tmpfs /mnt/ramdiska
+ - In the script, assign `TMP_DIR=/mnt/ramdisk`
+ 
