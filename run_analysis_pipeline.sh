@@ -2,7 +2,7 @@
 
 PROGNAME=`basename $0`
 
-while [[ $# -gt 1 ]]
+while [[ $# -gt 0 ]]
 do
 key="$1"
 
@@ -19,21 +19,26 @@ case $key in
     TMP_DIR="$2"
     shift
     ;;
+    -w|--overwrite_batchfile)
+    OVERWRITE_BATCHFILE=YES
+    ;;
     *)
-    # unknown option
+    echo Unknown option
     ;;
 esac
 shift
 done
 
-TMP_DIR="${TMP_DIR:-/tmp}"
 FILE_LIST_ABS_PATH="${FILE_LIST_ABS_PATH:-/home/ubuntu/bucket/}"
+OVERWRITE_BATCHFILE="${OVERWRITE_BATCHFILE:-NO}"
+TMP_DIR="${TMP_DIR:-/tmp}"
 
 echo --------------------------------------------------------------
-echo DATASET            = ${DATASET}
-echo PIPELINE_FILE      = ${PIPELINE_FILE}
-echo TMP_DIR            = ${TMP_DIR}
-echo FILE_LIST_ABS_PATH = ${FILE_LIST_ABS_PATH}
+echo DATASET             = ${DATASET}
+echo PIPELINE_FILE       = ${PIPELINE_FILE}
+echo TMP_DIR             = ${TMP_DIR}
+echo FILE_LIST_ABS_PATH  = ${FILE_LIST_ABS_PATH}
+echo OVERWRITE_BATCHFILE = ${OVERWRITE_BATCHFILE}
 echo --------------------------------------------------------------
 
 for var in DATASET PIPELINE_FILE TMP_DIR;
@@ -54,8 +59,10 @@ do
     fi
 done
 
-PIPELINE_FILE=`readlink -e ${PIPELINE_FILE}`
 FILE_LIST_ABS_PATH=`readlink -e ${FILE_LIST_ABS_PATH}`
+BASE_DIR=`dirname \`dirname ${PIPELINE_FILE}\``
+PIPELINE_FILE=`readlink -e ${PIPELINE_FILE}`
+PIPELINE_DIR=`dirname ${PIPELINE_FILE}`
 
 #------------------------------------------------------------------
 CP_DOCKER_IMAGE=shntnu/cellprofiler
@@ -63,9 +70,6 @@ FILELIST_FILENAME=filelist.txt
 PLATELIST_FILENAME=platelist.txt
 WELLLIST_FILENAME=welllist.txt
 #------------------------------------------------------------------
-
-PIPELINE_DIR=`dirname ${PIPELINE_FILE}`
-BASE_DIR=`dirname $PIPELINE_DIR`
 
 mkdir -p ${BASE_DIR}/analysis || exit 1
 mkdir -p ${BASE_DIR}/log || exit 1
@@ -125,9 +129,29 @@ else
     find ${STATUS_DIR} -name "*.txt" | xargs grep -l Complete |xargs -n 1 basename|cut -d"_" -f 2,4|cut -d"." -f1|tr '_' ' '|sort > ${SETS_FILE}.2
 fi
 
-#comm -23 ${SETS_FILE}.1 ${SETS_FILE}.2 |tr ' ' '\t' |head -n 3 > ${SETS_FILE}
 comm -23 ${SETS_FILE}.1 ${SETS_FILE}.2 |tr ' ' '\t' > ${SETS_FILE}
 
+# Create batch file
+if [[ ${OVERWRITE_BATCHFILE} == "YES" ||  (! -e ${OUTPUT_DIR}/Batch_data.h5 ) ]];
+then
+    docker run \
+	--rm \
+	--volume=${PIPELINE_DIR}:/pipeline_dir \
+	--volume=${FILELIST_DIR}:/filelist_dir \
+	--volume=${OUTPUT_DIR}:/output_dir \
+	--volume=${STATUS_DIR}:/status_dir \
+	--volume=${TMP_DIR}:/tmp_dir \
+	--volume=${FILE_LIST_ABS_PATH}:${FILE_LIST_ABS_PATH} \
+	${CP_DOCKER_IMAGE} \
+	-p /pipeline_dir/${PIPELINE_FILENAME} \
+	--file-list=/filelist_dir/${FILELIST_FILENAME} \
+	-o /output_dir/ \
+	-t /tmp_dir 
+else
+    echo Reusing batch file ${OUTPUT_DIR}/Batch_data.h5
+fi
+  
+# Run in parallel 
 parallel  \
     --no-run-if-empty \
     --delay .1 \
@@ -151,8 +175,7 @@ parallel  \
     --log-opt awslogs-group=${DATASET} \
     --log-opt awslogs-stream=Plate_{1}_Well_{2} \
     ${CP_DOCKER_IMAGE} \
-    -p /pipeline_dir/${PIPELINE_FILENAME} \
-    --file-list=/filelist_dir/${FILELIST_FILENAME} \
+    -p /output_dir/Batch_data.h5 \
     -o /output_dir/ \
     -t /tmp_dir \
     -g Metadata_Plate={1},Metadata_Well={2} \
