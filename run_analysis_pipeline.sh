@@ -124,6 +124,7 @@ fi;
 
 SETS_FILE=${LOG_DIR}/sets.txt
 
+echo Creating groups
 parallel --no-run-if-empty -a ${PLATELIST_FILE} -a ${WELLLIST_FILE} echo {1} {2}|sort > ${SETS_FILE}.1
 
 if [[ `find ${STATUS_DIR} -name "*.txt"|wc -l` -eq 0 ]];
@@ -137,8 +138,9 @@ fi
 comm -23 ${SETS_FILE}.1 ${SETS_FILE}.2 |tr ' ' '\t' > ${SETS_FILE}
 
 # Create batch file
-if [[ ${OVERWRITE_BATCHFILE} == "YES" ||  (! -e ${OUTPUT_DIR}/Batch_data.h5 ) ]];
+if [[ (${OVERWRITE_BATCHFILE} == "YES") ||  (! -e ${OUTPUT_DIR}/Batch_data.h5) ]];
 then
+    echo Creating batch file ${OUTPUT_DIR}/Batch_data.h5
     docker run \
 	--rm \
 	--volume=${PIPELINE_DIR}:/pipeline_dir \
@@ -155,7 +157,7 @@ then
 else
     echo Reusing batch file ${OUTPUT_DIR}/Batch_data.h5
 fi
-  
+
 # Run in parallel 
 parallel  \
     --no-run-if-empty \
