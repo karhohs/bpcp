@@ -11,6 +11,10 @@ case $key in
     DATASET="$2"
     shift
     ;;
+    -P|--max-procs)
+    MAXPROCS="$2"
+    shift
+    ;;
     -p|--pipeline)
     PIPELINE_FILE="$2"
     shift
@@ -30,6 +34,7 @@ shift
 done
 
 FILE_LIST_ABS_PATH="${FILE_LIST_ABS_PATH:-/home/ubuntu/bucket/}"
+MAXPROCS="${MAXPROCS:--0}"
 OVERWRITE_BATCHFILE="${OVERWRITE_BATCHFILE:-NO}"
 TMP_DIR="${TMP_DIR:-/tmp}"
 
@@ -155,7 +160,7 @@ fi
 parallel  \
     --no-run-if-empty \
     --delay .1 \
-    --max-procs -1 \
+    --max-procs ${MAXPROCS} \
     --timeout 200% \
     --load 100% \
     --eta \
