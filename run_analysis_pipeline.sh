@@ -33,7 +33,7 @@ esac
 shift
 done
 
-FILE_LIST_ABS_PATH="${FILE_LIST_ABS_PATH:-/home/ubuntu/bucket/}"
+PATHNAME_BASENAME="${PATHNAME_BASENAME:-/home/ubuntu/bucket/}"
 MAXPROCS="${MAXPROCS:--0}"
 OVERWRITE_BATCHFILE="${OVERWRITE_BATCHFILE:-NO}"
 TMP_DIR="${TMP_DIR:-/tmp}"
@@ -42,7 +42,7 @@ echo --------------------------------------------------------------
 echo DATASET             = ${DATASET}
 echo PIPELINE_FILE       = ${PIPELINE_FILE}
 echo TMP_DIR             = ${TMP_DIR}
-echo FILE_LIST_ABS_PATH  = ${FILE_LIST_ABS_PATH}
+echo PATHNAME_BASENAME  = ${PATHNAME_BASENAME}
 echo OVERWRITE_BATCHFILE = ${OVERWRITE_BATCHFILE}
 echo --------------------------------------------------------------
 
@@ -55,7 +55,7 @@ do
     fi
 done
 
-for var in PIPELINE_FILE FILE_LIST_ABS_PATH;
+for var in PIPELINE_FILE PATHNAME_BASENAME;
 do 
     if [[  -z `readlink -e ${!var}` ]];
     then
@@ -64,7 +64,7 @@ do
     fi
 done
 
-FILE_LIST_ABS_PATH=`readlink -e ${FILE_LIST_ABS_PATH}`
+PATHNAME_BASENAME=`readlink -e ${PATHNAME_BASENAME}`
 BASE_DIR=`dirname \`dirname ${PIPELINE_FILE}\``
 PIPELINE_FILE=`readlink -e ${PIPELINE_FILE}`
 PIPELINE_DIR=`dirname ${PIPELINE_FILE}`
@@ -72,6 +72,7 @@ PIPELINE_DIR=`dirname ${PIPELINE_FILE}`
 #------------------------------------------------------------------
 CP_DOCKER_IMAGE=shntnu/cellprofiler
 FILELIST_FILENAME=filelist.txt 
+DATAFILE_FILENAME=load_data.csv
 PLATELIST_FILENAME=platelist.txt
 WELLLIST_FILENAME=welllist.txt
 #------------------------------------------------------------------
@@ -82,6 +83,8 @@ mkdir -p ${BASE_DIR}/status || exit 1
 
 FILELIST_DIR=`readlink -e ${BASE_DIR}/filelist`/${DATASET}
 FILELIST_FILE=`readlink -e ${FILELIST_DIR}/${FILELIST_FILENAME}`
+DATAFILE_DIR=`readlink -e ${BASE_DIR}/load_data_csv`/${DATASET}
+DATAFILE_FILE=`readlink -e ${DATAFILE_DIR}/${DATAFILE_FILENAME}`
 METADATA_DIR=`readlink -e ${BASE_DIR}/metadata`/${DATASET}
 OUTPUT_DIR=`readlink -e ${BASE_DIR}/analysis`/${DATASET}
 PIPELINE_FILENAME=`basename ${PIPELINE_FILE}`
@@ -95,12 +98,13 @@ WELLLIST_FILE=`readlink -e ${METADATA_DIR}/${WELLLIST_FILENAME}`
 
 echo --------------------------------------------------------------
 echo FILELIST_FILE  = ${FILELIST_FILE}
+echo DATAFILE_FILE  = ${DATAFILE_FILE}
 echo PLATELIST_FILE = ${PLATELIST_FILE}
 echo WELLLIST_FILE  = ${WELLLIST_FILE}
 echo LOG_FILE       = ${LOG_FILE}
 echo --------------------------------------------------------------
 
-for var in FILELIST_FILE PLATELIST_FILE WELLLIST_FILE;
+for var in FILELIST_FILE DATAFILE_FILE PLATELIST_FILE WELLLIST_FILE;
 do 
     if [[  -z "${!var}"  ]];
     then
@@ -148,7 +152,7 @@ then
 	--volume=${OUTPUT_DIR}:/output_dir \
 	--volume=${STATUS_DIR}:/status_dir \
 	--volume=${TMP_DIR}:/tmp_dir \
-	--volume=${FILE_LIST_ABS_PATH}:${FILE_LIST_ABS_PATH} \
+	--volume=${PATHNAME_BASENAME}:${PATHNAME_BASENAME} \
 	${CP_DOCKER_IMAGE} \
 	-p /pipeline_dir/${PIPELINE_FILENAME} \
 	--file-list=/filelist_dir/${FILELIST_FILENAME} \
@@ -160,6 +164,7 @@ fi
 
 # Run in parallel 
 parallel  \
+	--dry-run \
     --no-run-if-empty \
     --delay .1 \
     --max-procs ${MAXPROCS} \
@@ -177,7 +182,7 @@ parallel  \
     --volume=${OUTPUT_DIR}:/output_dir \
     --volume=${STATUS_DIR}:/status_dir \
     --volume=${TMP_DIR}:/tmp_dir \
-    --volume=${FILE_LIST_ABS_PATH}:${FILE_LIST_ABS_PATH} \
+    --volume=${PATHNAME_BASENAME}:${PATHNAME_BASENAME} \
     --log-driver=awslogs \
     --log-opt awslogs-group=${DATASET} \
     --log-opt awslogs-stream=Plate_{1}_Well_{2} \
