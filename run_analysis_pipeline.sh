@@ -104,7 +104,13 @@ echo WELLLIST_FILE  = ${WELLLIST_FILE}
 echo LOG_FILE       = ${LOG_FILE}
 echo --------------------------------------------------------------
 
-for var in FILELIST_FILE DATAFILE_FILE PLATELIST_FILE WELLLIST_FILE;
+if [[ -z $FILELIST_FILE && -z $DATAFILE_FILE ]];
+then
+    echo Either FILELIST_FILE or DATAFILE_FILE must be defined
+    exit 1
+fi
+
+for var in  PLATELIST_FILE WELLLIST_FILE;
 do 
     if [[  -z "${!var}"  ]];
     then
@@ -141,21 +147,34 @@ fi
 
 comm -23 ${SETS_FILE}.1 ${SETS_FILE}.2 |tr ' ' '\t' > ${SETS_FILE}
 
+if [[ -e $DATAFILE_FILE ]];
+then
+    FILELIST_OR_DATAFILE="--data-file=/datafile_dir/${DATAFILE_FILENAME}"
+elif [[ -e $FILELIST_FILE ]];
+then
+    FILELIST_OR_DATAFILE="--file-list=/filelist_dir/${FILELIST_FILENAME}"
+else
+    echo Either FILELIST_FILE or DATAFILE_FILE must be defined
+    exit 1
+fi
+
 # Create batch file
 if [[ (${OVERWRITE_BATCHFILE} == "YES") ||  (! -e ${OUTPUT_DIR}/Batch_data.h5) ]];
 then
     echo Creating batch file ${OUTPUT_DIR}/Batch_data.h5
+    echo \
     docker run \
 	--rm \
 	--volume=${PIPELINE_DIR}:/pipeline_dir \
 	--volume=${FILELIST_DIR}:/filelist_dir \
+	--volume=${DATAFILE_DIR}:/datafile_dir \
 	--volume=${OUTPUT_DIR}:/output_dir \
 	--volume=${STATUS_DIR}:/status_dir \
 	--volume=${TMP_DIR}:/tmp_dir \
 	--volume=${PATHNAME_BASENAME}:${PATHNAME_BASENAME} \
 	${CP_DOCKER_IMAGE} \
 	-p /pipeline_dir/${PIPELINE_FILENAME} \
-	--file-list=/filelist_dir/${FILELIST_FILENAME} \
+	${FILELIST_OR_DATAFILE} \
 	-o /output_dir/ \
 	-t /tmp_dir 
 else
@@ -164,7 +183,7 @@ fi
 
 # Run in parallel 
 parallel  \
-	--dry-run \
+    --dry-run \
     --no-run-if-empty \
     --delay .1 \
     --max-procs ${MAXPROCS} \
