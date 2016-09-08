@@ -91,11 +91,12 @@ FILELIST_FILE=`readlink -e ${FILELIST_DIR}/${FILELIST_FILENAME}`
 DATAFILE_DIR=`readlink -e ${BASE_DIR}/load_data_csv`/${DATASET}
 DATAFILE_FILE=`readlink -e ${DATAFILE_DIR}/${DATAFILE_FILENAME}`
 METADATA_DIR=`readlink -e ${BASE_DIR}/metadata`/${DATASET}
-OUTPUT_DIR=`readlink -e ${BASE_DIR}/analysis`/${DATASET}
 PIPELINE_FILENAME=`basename ${PIPELINE_FILE}`
+PIPELINE_TAG=`echo ${PIPELINE_FILENAME}|cut -d"." -f1`
+OUTPUT_DIR=`readlink -e ${BASE_DIR}/analysis`/${DATASET}/${PIPELINE_TAG}
 PLATELIST_FILE=`readlink -e ${METADATA_DIR}/${PLATELIST_FILENAME}`
-STATUS_DIR=`readlink -e ${BASE_DIR}/status`/${DATASET}/
-LOG_DIR=`readlink -e ${BASE_DIR}/log`/${DATASET}
+STATUS_DIR=`readlink -e ${BASE_DIR}/status`/${DATASET}/${PIPELINE_TAG}
+LOG_DIR=`readlink -e ${BASE_DIR}/log`/${DATASET}/${PIPELINE_TAG}
 mkdir -p $LOG_DIR || exit 1
 DATE=$(date +"%Y%m%d%H%M%S")
 LOG_FILE=`mktemp --tmpdir=${LOG_DIR} ${PROGNAME}_${DATASET}_${DATE}_XXXXXX` || exit 1
@@ -195,8 +196,11 @@ else
     echo Reusing batch file ${OUTPUT_DIR}/Batch_data.h5
 fi
 
+exit 1
+
 # Run in parallel 
 parallel  \
+    --dry-run \
     --no-run-if-empty \
     --delay .1 \
     --max-procs ${MAXPROCS} \
