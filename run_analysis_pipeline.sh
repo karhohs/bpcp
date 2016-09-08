@@ -93,7 +93,7 @@ DATAFILE_FILE=`readlink -e ${DATAFILE_DIR}/${DATAFILE_FILENAME}`
 METADATA_DIR=`readlink -e ${BASE_DIR}/metadata`/${DATASET}
 PIPELINE_FILENAME=`basename ${PIPELINE_FILE}`
 PIPELINE_TAG=`echo ${PIPELINE_FILENAME}|cut -d"." -f1`
-OUTPUT_DIR=`readlink -e ${BASE_DIR}/analysis`/${DATASET}/
+OUTPUT_DIR=`readlink -e ${BASE_DIR}/analysis`/${DATASET}
 PLATELIST_FILE=`readlink -e ${METADATA_DIR}/${PLATELIST_FILENAME}`
 STATUS_DIR=`readlink -e ${BASE_DIR}/status`/${DATASET}/${PIPELINE_TAG}
 LOG_DIR=`readlink -e ${BASE_DIR}/log`/${DATASET}/${PIPELINE_TAG}
@@ -175,9 +175,9 @@ else
 fi
 
 # Create batch file
-if [[ (${OVERWRITE_BATCHFILE} == "YES") ||  (! -e ${OUTPUT_DIR}/Batch_data.h5) ]];
+if [[ (${OVERWRITE_BATCHFILE} == "YES") ||  (! -e ${OUTPUT_DIR}/${PIPELINE_TAG}/Batch_data.h5) ]];
 then
-    echo Creating batch file ${OUTPUT_DIR}/Batch_data.h5
+    echo Creating batch file ${OUTPUT_DIR}/${PIPELINE_TAG}/Batch_data.h5
     docker run \
 	--rm \
 	--volume=${PIPELINE_DIR}:/pipeline_dir \
@@ -193,7 +193,7 @@ then
 	-o /output_dir/${PIPELINE_TAG}/ \
 	-t /tmp_dir 
 else
-    echo Reusing batch file ${OUTPUT_DIR}/Batch_data.h5
+    echo Reusing batch file ${OUTPUT_DIR}/${PIPELINE_TAG}/Batch_data.h5
 fi
 
 # Run in parallel 
