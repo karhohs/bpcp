@@ -198,7 +198,6 @@ fi
 
 # Run in parallel 
 parallel  \
-    --dry-run \
     --no-run-if-empty \
     --delay .1 \
     --max-procs ${MAXPROCS} \
