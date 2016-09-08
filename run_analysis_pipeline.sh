@@ -93,7 +93,7 @@ DATAFILE_FILE=`readlink -e ${DATAFILE_DIR}/${DATAFILE_FILENAME}`
 METADATA_DIR=`readlink -e ${BASE_DIR}/metadata`/${DATASET}
 PIPELINE_FILENAME=`basename ${PIPELINE_FILE}`
 PIPELINE_TAG=`echo ${PIPELINE_FILENAME}|cut -d"." -f1`
-OUTPUT_DIR=`readlink -e ${BASE_DIR}/analysis`/${DATASET}/${PIPELINE_TAG}
+OUTPUT_DIR=`readlink -e ${BASE_DIR}/analysis`/${DATASET}/
 PLATELIST_FILE=`readlink -e ${METADATA_DIR}/${PLATELIST_FILENAME}`
 STATUS_DIR=`readlink -e ${BASE_DIR}/status`/${DATASET}/${PIPELINE_TAG}
 LOG_DIR=`readlink -e ${BASE_DIR}/log`/${DATASET}/${PIPELINE_TAG}
@@ -190,13 +190,11 @@ then
 	${CP_DOCKER_IMAGE} \
 	-p /pipeline_dir/${PIPELINE_FILENAME} \
 	${FILELIST_OR_DATAFILE} \
-	-o /output_dir/ \
+	-o /output_dir/${PIPELINE_TAG}/ \
 	-t /tmp_dir 
 else
     echo Reusing batch file ${OUTPUT_DIR}/Batch_data.h5
 fi
-
-exit 1
 
 # Run in parallel 
 parallel  \
@@ -224,9 +222,9 @@ parallel  \
     --log-opt awslogs-group=${DATASET} \
     --log-opt awslogs-stream=${GROUP_NAME} \
     ${CP_DOCKER_IMAGE} \
-    -p /output_dir/Batch_data.h5 \
+    -p /output_dir/${PIPELINE_TAG}/Batch_data.h5 \
     ${FILELIST_OR_DATAFILE} \
-    -o /output_dir/ \
+    -o /output_dir/${PIPELINE_TAG}/ \
     -t /tmp_dir \
     -g ${GROUP_OPTS} \
     -d /status_dir/${GROUP_NAME}.txt
