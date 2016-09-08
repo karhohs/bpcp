@@ -26,6 +26,9 @@ case $key in
     -w|--overwrite_batchfile)
     OVERWRITE_BATCHFILE=YES
     ;;
+    -k|--group_by_plate)
+    GROUP_BY_PLATE=YES
+    ;;
     *)
     echo Unknown option
     ;;
@@ -36,14 +39,16 @@ done
 PATHNAME_BASENAME="${PATHNAME_BASENAME:-/home/ubuntu/bucket/}"
 MAXPROCS="${MAXPROCS:--0}"
 OVERWRITE_BATCHFILE="${OVERWRITE_BATCHFILE:-NO}"
+GROUP_BY_PLATE="${GROUP_BY_PLATE:-NO}"
 TMP_DIR="${TMP_DIR:-/tmp}"
 
 echo --------------------------------------------------------------
 echo DATASET             = ${DATASET}
 echo PIPELINE_FILE       = ${PIPELINE_FILE}
 echo TMP_DIR             = ${TMP_DIR}
-echo PATHNAME_BASENAME  = ${PATHNAME_BASENAME}
+echo PATHNAME_BASENAME   = ${PATHNAME_BASENAME}
 echo OVERWRITE_BATCHFILE = ${OVERWRITE_BATCHFILE}
+echo GROUP_BY_PLATE      = ${GROUP_BY_PLATE}
 echo --------------------------------------------------------------
 
 for var in DATASET PIPELINE_FILE TMP_DIR;
@@ -135,14 +140,24 @@ fi;
 SETS_FILE=${LOG_DIR}/sets.txt
 
 echo Creating groups
-parallel --no-run-if-empty -a ${PLATELIST_FILE} -a ${WELLLIST_FILE} echo {1} {2}|sort > ${SETS_FILE}.1
+
+if [[ ${GROUP_BY_PLATE} == "YES" ]];
+then
+    parallel --no-run-if-empty -a ${PLATELIST_FILE} echo {1} |sort > ${SETS_FILE}.1
+    GROUP_NAME="Plate_{1}"
+    GROUP_OPTS="Metadata_Plate={1}"
+else
+    parallel --no-run-if-empty -a ${PLATELIST_FILE} -a ${WELLLIST_FILE} echo {1} {2}|sort > ${SETS_FILE}.1
+    GROUP_NAME="Plate_{1}_Well_{2}"
+    GROUP_OPTS="Metadata_Plate={1},Metadata_Well={2}"
+fi
 
 if [[ `find ${STATUS_DIR} -name "*.txt"|wc -l` -eq 0 ]];
 then
-    rm ${SETS_FILE}.2
+    rm -f ${SETS_FILE}.2
     touch ${SETS_FILE}.2
 else
-    find ${STATUS_DIR} -name "*.txt" | xargs grep -l Complete |xargs -n 1 basename|cut -d"_" -f 2,4|cut -d"." -f1|tr '_' ' '|sort > ${SETS_FILE}.2
+    find ${STATUS_DIR} -name "*.txt" | xargs grep -l Complete |xargs -r -n 1 basename|cut -d"_" -f 2,4|cut -d"." -f1|tr '_' ' '|sort > ${SETS_FILE}.2
 fi
 
 comm -23 ${SETS_FILE}.1 ${SETS_FILE}.2 |tr ' ' '\t' > ${SETS_FILE}
@@ -162,7 +177,6 @@ fi
 if [[ (${OVERWRITE_BATCHFILE} == "YES") ||  (! -e ${OUTPUT_DIR}/Batch_data.h5) ]];
 then
     echo Creating batch file ${OUTPUT_DIR}/Batch_data.h5
-    echo \
     docker run \
 	--rm \
 	--volume=${PIPELINE_DIR}:/pipeline_dir \
@@ -183,7 +197,6 @@ fi
 
 # Run in parallel 
 parallel  \
-    --dry-run \
     --no-run-if-empty \
     --delay .1 \
     --max-procs ${MAXPROCS} \
@@ -198,16 +211,19 @@ parallel  \
     --rm \
     --volume=${PIPELINE_DIR}:/pipeline_dir \
     --volume=${FILELIST_DIR}:/filelist_dir \
+    --volume=${DATAFILE_DIR}:/datafile_dir \
     --volume=${OUTPUT_DIR}:/output_dir \
     --volume=${STATUS_DIR}:/status_dir \
     --volume=${TMP_DIR}:/tmp_dir \
     --volume=${PATHNAME_BASENAME}:${PATHNAME_BASENAME} \
     --log-driver=awslogs \
     --log-opt awslogs-group=${DATASET} \
-    --log-opt awslogs-stream=Plate_{1}_Well_{2} \
+    --log-opt awslogs-stream=${GROUP_NAME} \
     ${CP_DOCKER_IMAGE} \
     -p /output_dir/Batch_data.h5 \
+    ${FILELIST_OR_DATAFILE} \
     -o /output_dir/ \
     -t /tmp_dir \
-    -g Metadata_Plate={1},Metadata_Well={2} \
-    -d /status_dir/Plate_{1}_Well_{2}.txt
+    -g ${GROUP_OPTS} \
+    -d /status_dir/${GROUP_NAME}.txt
+
