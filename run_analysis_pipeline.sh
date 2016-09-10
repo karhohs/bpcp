@@ -137,6 +137,8 @@ then
             exit 1
 	fi
     done
+else
+    type csvcut >/dev/null 2>&1 || { echo >&2 "csvcut not installed.  Aborting."; exit 1; }
 fi
 
 mkdir -p $OUTPUT_DIR || exit 1
@@ -160,18 +162,18 @@ echo Creating groups
 
 if [[ ${GROUP_BY_PLATE} == "YES" ]];
 then
-    if [[ ! -z $DATAFILE_FILE ]];
+    if [[ ${CREATE_GROUPS_FROM_DATA_FILE} == "YES" ]];
     then
-	csvcut -c Metadata_Plate ${DATAFILE_FILE}|tr ',' '\t'|grep -v Metadata|uniq|sort > ${SETS_ALL_FILE}
+	csvcut -c Metadata_Plate ${DATAFILE_FILE}|tr ',' '\t'|grep -v Metadata|sort|uniq > ${SETS_ALL_FILE}
     else
 	parallel --no-run-if-empty -a ${PLATELIST_FILE} echo {1} |sort > ${SETS_ALL_FILE}
     fi
     GROUP_NAME="Plate_{1}"
     GROUP_OPTS="Metadata_Plate={1}"
 else
-    if [[ ! -z $DATAFILE_FILE ]];
+    if [[ ${CREATE_GROUPS_FROM_DATA_FILE} == "YES" ]];
     then
-	csvcut -c Metadata_Plate,Metadata_Well ${DATAFILE_FILE}|tr ',' '\t'|grep -v Metadata|sort > ${SETS_ALL_FILE}
+	csvcut -c Metadata_Plate,Metadata_Well ${DATAFILE_FILE}|tr ',' '\t'|grep -v Metadata|sort|uniq > ${SETS_ALL_FILE}
     else
 	parallel --no-run-if-empty -a ${PLATELIST_FILE} -a ${WELLLIST_FILE} echo {1} {2}|sort > ${SETS_ALL_FILE}
     fi
@@ -221,8 +223,6 @@ then
 else
     echo Reusing batch file ${OUTPUT_DIR}/${PIPELINE_TAG}/Batch_data.h5
 fi
-
-exit 1
 
 # Run in parallel 
 parallel  \
