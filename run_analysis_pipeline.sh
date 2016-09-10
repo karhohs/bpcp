@@ -26,6 +26,12 @@ case $key in
     -w|--overwrite_batchfile)
     OVERWRITE_BATCHFILE=YES
     ;;
+    -k|--group_by_plate)
+    GROUP_BY_PLATE=YES
+    ;;
+    -c|--create_groups_from_data_file)
+    CREATE_GROUPS_FROM_DATA_FILE=YES
+    ;;
     *)
     echo Unknown option
     ;;
@@ -33,17 +39,21 @@ esac
 shift
 done
 
-FILE_LIST_ABS_PATH="${FILE_LIST_ABS_PATH:-/home/ubuntu/bucket/}"
+PATHNAME_BASENAME="${PATHNAME_BASENAME:-/home/ubuntu/bucket/}"
 MAXPROCS="${MAXPROCS:--0}"
 OVERWRITE_BATCHFILE="${OVERWRITE_BATCHFILE:-NO}"
+GROUP_BY_PLATE="${GROUP_BY_PLATE:-NO}"
+CREATE_GROUPS_FROM_DATA_FILE="${CREATE_GROUPS_FROM_DATA_FILE:-NO}"
 TMP_DIR="${TMP_DIR:-/tmp}"
 
 echo --------------------------------------------------------------
 echo DATASET             = ${DATASET}
 echo PIPELINE_FILE       = ${PIPELINE_FILE}
 echo TMP_DIR             = ${TMP_DIR}
-echo FILE_LIST_ABS_PATH  = ${FILE_LIST_ABS_PATH}
+echo PATHNAME_BASENAME   = ${PATHNAME_BASENAME}
 echo OVERWRITE_BATCHFILE = ${OVERWRITE_BATCHFILE}
+echo GROUP_BY_PLATE      = ${GROUP_BY_PLATE}
+echo CREATE_GROUPS_FROM_DATA_FILE = ${CREATE_GROUPS_FROM_DATA_FILE}
 echo --------------------------------------------------------------
 
 for var in DATASET PIPELINE_FILE TMP_DIR;
@@ -55,7 +65,7 @@ do
     fi
 done
 
-for var in PIPELINE_FILE FILE_LIST_ABS_PATH;
+for var in PIPELINE_FILE PATHNAME_BASENAME;
 do 
     if [[  -z `readlink -e ${!var}` ]];
     then
@@ -64,7 +74,7 @@ do
     fi
 done
 
-FILE_LIST_ABS_PATH=`readlink -e ${FILE_LIST_ABS_PATH}`
+PATHNAME_BASENAME=`readlink -e ${PATHNAME_BASENAME}`
 BASE_DIR=`dirname \`dirname ${PIPELINE_FILE}\``
 PIPELINE_FILE=`readlink -e ${PIPELINE_FILE}`
 PIPELINE_DIR=`dirname ${PIPELINE_FILE}`
@@ -72,6 +82,7 @@ PIPELINE_DIR=`dirname ${PIPELINE_FILE}`
 #------------------------------------------------------------------
 CP_DOCKER_IMAGE=shntnu/cellprofiler
 FILELIST_FILENAME=filelist.txt 
+DATAFILE_FILENAME=load_data.csv
 PLATELIST_FILENAME=platelist.txt
 WELLLIST_FILENAME=welllist.txt
 #------------------------------------------------------------------
@@ -82,12 +93,15 @@ mkdir -p ${BASE_DIR}/status || exit 1
 
 FILELIST_DIR=`readlink -e ${BASE_DIR}/filelist`/${DATASET}
 FILELIST_FILE=`readlink -e ${FILELIST_DIR}/${FILELIST_FILENAME}`
+DATAFILE_DIR=`readlink -e ${BASE_DIR}/load_data_csv`/${DATASET}
+DATAFILE_FILE=`readlink -e ${DATAFILE_DIR}/${DATAFILE_FILENAME}`
 METADATA_DIR=`readlink -e ${BASE_DIR}/metadata`/${DATASET}
-OUTPUT_DIR=`readlink -e ${BASE_DIR}/analysis`/${DATASET}
 PIPELINE_FILENAME=`basename ${PIPELINE_FILE}`
+PIPELINE_TAG=`echo ${PIPELINE_FILENAME}|cut -d"." -f1`
+OUTPUT_DIR=`readlink -e ${BASE_DIR}/analysis`/${DATASET}
 PLATELIST_FILE=`readlink -e ${METADATA_DIR}/${PLATELIST_FILENAME}`
-STATUS_DIR=`readlink -e ${BASE_DIR}/status`/${DATASET}/
-LOG_DIR=`readlink -e ${BASE_DIR}/log`/${DATASET}
+STATUS_DIR=`readlink -e ${BASE_DIR}/status`/${DATASET}/${PIPELINE_TAG}
+LOG_DIR=`readlink -e ${BASE_DIR}/log`/${DATASET}/${PIPELINE_TAG}
 mkdir -p $LOG_DIR || exit 1
 DATE=$(date +"%Y%m%d%H%M%S")
 LOG_FILE=`mktemp --tmpdir=${LOG_DIR} ${PROGNAME}_${DATASET}_${DATE}_XXXXXX` || exit 1
@@ -95,19 +109,37 @@ WELLLIST_FILE=`readlink -e ${METADATA_DIR}/${WELLLIST_FILENAME}`
 
 echo --------------------------------------------------------------
 echo FILELIST_FILE  = ${FILELIST_FILE}
+echo DATAFILE_FILE  = ${DATAFILE_FILE}
 echo PLATELIST_FILE = ${PLATELIST_FILE}
 echo WELLLIST_FILE  = ${WELLLIST_FILE}
 echo LOG_FILE       = ${LOG_FILE}
 echo --------------------------------------------------------------
 
-for var in FILELIST_FILE PLATELIST_FILE WELLLIST_FILE;
-do 
-    if [[  -z "${!var}"  ]];
-    then
-        echo ${var} not defined.
-        exit 1
-    fi
-done
+if [[ -z $FILELIST_FILE && -z $DATAFILE_FILE ]];
+then
+    echo Either FILELIST_FILE or DATAFILE_FILE must be defined
+    exit 1
+fi
+
+if [[ ${CREATE_GROUPS_FROM_DATA_FILE} == "YES" && -z ${DATAFILE_FILE} ]];
+then
+    echo "DATAFILE_FILE must be defined to create groups from data-file"
+    exit 1
+fi
+
+if [[ $CREATE_GROUPS_FROM_DATA_FILE == "NO" ]];
+then
+    for var in  PLATELIST_FILE WELLLIST_FILE;
+    do 
+	if [[  -z "${!var}"  ]];
+	then
+            echo ${var} not defined.
+            exit 1
+	fi
+    done
+else
+    type csvcut >/dev/null 2>&1 || { echo >&2 "csvcut not installed.  Aborting."; exit 1; }
+fi
 
 mkdir -p $OUTPUT_DIR || exit 1
 mkdir -p $STATUS_DIR || exit 1
@@ -122,40 +154,74 @@ then
     exit 1
 fi;
 
-SETS_FILE=${LOG_DIR}/sets.txt
+SETS_ALL_FILE=${LOG_DIR}/sets_all.txt
+SETS_TODO_FILE=${LOG_DIR}/sets_todo.txt
+SETS_DONE_FILE=${LOG_DIR}/sets_done.txt
 
 echo Creating groups
-parallel --no-run-if-empty -a ${PLATELIST_FILE} -a ${WELLLIST_FILE} echo {1} {2}|sort > ${SETS_FILE}.1
+
+if [[ ${GROUP_BY_PLATE} == "YES" ]];
+then
+    if [[ ${CREATE_GROUPS_FROM_DATA_FILE} == "YES" ]];
+    then
+	csvcut -c Metadata_Plate ${DATAFILE_FILE}|tr ',' '\t'|grep -v Metadata|sort|uniq > ${SETS_ALL_FILE}
+    else
+	parallel --no-run-if-empty -a ${PLATELIST_FILE} echo {1} |sort > ${SETS_ALL_FILE}
+    fi
+    GROUP_NAME="Plate_{1}"
+    GROUP_OPTS="Metadata_Plate={1}"
+else
+    if [[ ${CREATE_GROUPS_FROM_DATA_FILE} == "YES" ]];
+    then
+	csvcut -c Metadata_Plate,Metadata_Well ${DATAFILE_FILE}|tr ',' '\t'|grep -v Metadata|sort|uniq > ${SETS_ALL_FILE}
+    else
+	parallel --no-run-if-empty -a ${PLATELIST_FILE} -a ${WELLLIST_FILE} echo {1} {2}|sort > ${SETS_ALL_FILE}
+    fi
+    GROUP_NAME="Plate_{1}_Well_{2}"
+    GROUP_OPTS="Metadata_Plate={1},Metadata_Well={2}"
+fi
 
 if [[ `find ${STATUS_DIR} -name "*.txt"|wc -l` -eq 0 ]];
 then
-    rm ${SETS_FILE}.2
-    touch ${SETS_FILE}.2
+    rm -f ${SETS_DONE_FILE}
+    touch ${SETS_DONE_FILE}
 else
-    find ${STATUS_DIR} -name "*.txt" | xargs grep -l Complete |xargs -n 1 basename|cut -d"_" -f 2,4|cut -d"." -f1|tr '_' ' '|sort > ${SETS_FILE}.2
+    find ${STATUS_DIR} -name "*.txt" | xargs grep -l Complete |xargs -r -n 1 basename|cut -d"_" -f 2,4|cut -d"." -f1|tr '_' ' '|sort > ${SETS_DONE_FILE}
 fi
 
-comm -23 ${SETS_FILE}.1 ${SETS_FILE}.2 |tr ' ' '\t' > ${SETS_FILE}
+comm -23 ${SETS_ALL_FILE} ${SETS_DONE_FILE} |tr ' ' '\t' > ${SETS_TODO_FILE}
+
+if [[ -e $DATAFILE_FILE ]];
+then
+    FILELIST_OR_DATAFILE="--data-file=/datafile_dir/${DATAFILE_FILENAME}"
+elif [[ -e $FILELIST_FILE ]];
+then
+    FILELIST_OR_DATAFILE="--file-list=/filelist_dir/${FILELIST_FILENAME}"
+else
+    echo Either FILELIST_FILE or DATAFILE_FILE must be defined
+    exit 1
+fi
 
 # Create batch file
-if [[ (${OVERWRITE_BATCHFILE} == "YES") ||  (! -e ${OUTPUT_DIR}/Batch_data.h5) ]];
+if [[ (${OVERWRITE_BATCHFILE} == "YES") ||  (! -e ${OUTPUT_DIR}/${PIPELINE_TAG}/Batch_data.h5) ]];
 then
-    echo Creating batch file ${OUTPUT_DIR}/Batch_data.h5
+    echo Creating batch file ${OUTPUT_DIR}/${PIPELINE_TAG}/Batch_data.h5
     docker run \
 	--rm \
 	--volume=${PIPELINE_DIR}:/pipeline_dir \
 	--volume=${FILELIST_DIR}:/filelist_dir \
+	--volume=${DATAFILE_DIR}:/datafile_dir \
 	--volume=${OUTPUT_DIR}:/output_dir \
 	--volume=${STATUS_DIR}:/status_dir \
 	--volume=${TMP_DIR}:/tmp_dir \
-	--volume=${FILE_LIST_ABS_PATH}:${FILE_LIST_ABS_PATH} \
+	--volume=${PATHNAME_BASENAME}:${PATHNAME_BASENAME} \
 	${CP_DOCKER_IMAGE} \
 	-p /pipeline_dir/${PIPELINE_FILENAME} \
-	--file-list=/filelist_dir/${FILELIST_FILENAME} \
-	-o /output_dir/ \
+	${FILELIST_OR_DATAFILE} \
+	-o /output_dir/${PIPELINE_TAG}/ \
 	-t /tmp_dir 
 else
-    echo Reusing batch file ${OUTPUT_DIR}/Batch_data.h5
+    echo Reusing batch file ${OUTPUT_DIR}/${PIPELINE_TAG}/Batch_data.h5
 fi
 
 # Run in parallel 
@@ -168,22 +234,25 @@ parallel  \
     --eta \
     --progress \
     --joblog ${LOG_FILE} \
-    -a ${SETS_FILE} \
+    -a ${SETS_TODO_FILE} \
     --colsep '\t' \
     docker run \
     --rm \
     --volume=${PIPELINE_DIR}:/pipeline_dir \
     --volume=${FILELIST_DIR}:/filelist_dir \
+    --volume=${DATAFILE_DIR}:/datafile_dir \
     --volume=${OUTPUT_DIR}:/output_dir \
     --volume=${STATUS_DIR}:/status_dir \
     --volume=${TMP_DIR}:/tmp_dir \
-    --volume=${FILE_LIST_ABS_PATH}:${FILE_LIST_ABS_PATH} \
+    --volume=${PATHNAME_BASENAME}:${PATHNAME_BASENAME} \
     --log-driver=awslogs \
     --log-opt awslogs-group=${DATASET} \
-    --log-opt awslogs-stream=Plate_{1}_Well_{2} \
+    --log-opt awslogs-stream=${GROUP_NAME} \
     ${CP_DOCKER_IMAGE} \
-    -p /output_dir/Batch_data.h5 \
-    -o /output_dir/ \
+    -p /output_dir/${PIPELINE_TAG}/Batch_data.h5 \
+    ${FILELIST_OR_DATAFILE} \
+    -o /output_dir/${PIPELINE_TAG}/ \
     -t /tmp_dir \
-    -g Metadata_Plate={1},Metadata_Well={2} \
-    -d /status_dir/Plate_{1}_Well_{2}.txt
+    -g ${GROUP_OPTS} \
+    -d /status_dir/${GROUP_NAME}.txt
+
