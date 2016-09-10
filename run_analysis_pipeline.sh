@@ -29,6 +29,9 @@ case $key in
     -k|--group_by_plate)
     GROUP_BY_PLATE=YES
     ;;
+    -c|--create_groups_from_data_file)
+    CREATE_GROUPS_FROM_DATA_FILE=YES
+    ;;
     *)
     echo Unknown option
     ;;
@@ -40,6 +43,7 @@ PATHNAME_BASENAME="${PATHNAME_BASENAME:-/home/ubuntu/bucket/}"
 MAXPROCS="${MAXPROCS:--0}"
 OVERWRITE_BATCHFILE="${OVERWRITE_BATCHFILE:-NO}"
 GROUP_BY_PLATE="${GROUP_BY_PLATE:-NO}"
+CREATE_GROUPS_FROM_DATA_FILE="${CREATE_GROUPS_FROM_DATA_FILE:-NO}"
 TMP_DIR="${TMP_DIR:-/tmp}"
 
 echo --------------------------------------------------------------
@@ -49,6 +53,7 @@ echo TMP_DIR             = ${TMP_DIR}
 echo PATHNAME_BASENAME   = ${PATHNAME_BASENAME}
 echo OVERWRITE_BATCHFILE = ${OVERWRITE_BATCHFILE}
 echo GROUP_BY_PLATE      = ${GROUP_BY_PLATE}
+echo CREATE_GROUPS_FROM_DATA_FILE = ${CREATE_GROUPS_FROM_DATA_FILE}
 echo --------------------------------------------------------------
 
 for var in DATASET PIPELINE_FILE TMP_DIR;
@@ -116,14 +121,23 @@ then
     exit 1
 fi
 
-for var in  PLATELIST_FILE WELLLIST_FILE;
-do 
-    if [[  -z "${!var}"  ]];
-    then
-        echo ${var} not defined.
-        exit 1
-    fi
-done
+if [[ ${CREATE_GROUPS_FROM_DATA_FILE} == "YES" && -z ${DATAFILE_FILE} ]];
+then
+    echo "DATAFILE_FILE must be defined to create groups from data-file"
+    exit 1
+fi
+
+if [[ $CREATE_GROUPS_FROM_DATA_FILE == "NO" ]];
+then
+    for var in  PLATELIST_FILE WELLLIST_FILE;
+    do 
+	if [[  -z "${!var}"  ]];
+	then
+            echo ${var} not defined.
+            exit 1
+	fi
+    done
+fi
 
 mkdir -p $OUTPUT_DIR || exit 1
 mkdir -p $STATUS_DIR || exit 1
@@ -138,30 +152,42 @@ then
     exit 1
 fi;
 
-SETS_FILE=${LOG_DIR}/sets.txt
+SETS_ALL_FILE=${LOG_DIR}/sets_all.txt
+SETS_TODO_FILE=${LOG_DIR}/sets_todo.txt
+SETS_DONE_FILE=${LOG_DIR}/sets_done.txt
 
 echo Creating groups
 
 if [[ ${GROUP_BY_PLATE} == "YES" ]];
 then
-    parallel --no-run-if-empty -a ${PLATELIST_FILE} echo {1} |sort > ${SETS_FILE}.1
+    if [[ ! -z $DATAFILE_FILE ]];
+    then
+	csvcut -c Metadata_Plate ${DATAFILE_FILE}|tr ',' '\t'|grep -v Metadata|uniq|sort > ${SETS_ALL_FILE}
+    else
+	parallel --no-run-if-empty -a ${PLATELIST_FILE} echo {1} |sort > ${SETS_ALL_FILE}
+    fi
     GROUP_NAME="Plate_{1}"
     GROUP_OPTS="Metadata_Plate={1}"
 else
-    parallel --no-run-if-empty -a ${PLATELIST_FILE} -a ${WELLLIST_FILE} echo {1} {2}|sort > ${SETS_FILE}.1
+    if [[ ! -z $DATAFILE_FILE ]];
+    then
+	csvcut -c Metadata_Plate,Metadata_Well ${DATAFILE_FILE}|tr ',' '\t'|grep -v Metadata|sort > ${SETS_ALL_FILE}
+    else
+	parallel --no-run-if-empty -a ${PLATELIST_FILE} -a ${WELLLIST_FILE} echo {1} {2}|sort > ${SETS_ALL_FILE}
+    fi
     GROUP_NAME="Plate_{1}_Well_{2}"
     GROUP_OPTS="Metadata_Plate={1},Metadata_Well={2}"
 fi
 
 if [[ `find ${STATUS_DIR} -name "*.txt"|wc -l` -eq 0 ]];
 then
-    rm -f ${SETS_FILE}.2
-    touch ${SETS_FILE}.2
+    rm -f ${SETS_DONE_FILE}
+    touch ${SETS_DONE_FILE}
 else
-    find ${STATUS_DIR} -name "*.txt" | xargs grep -l Complete |xargs -r -n 1 basename|cut -d"_" -f 2,4|cut -d"." -f1|tr '_' ' '|sort > ${SETS_FILE}.2
+    find ${STATUS_DIR} -name "*.txt" | xargs grep -l Complete |xargs -r -n 1 basename|cut -d"_" -f 2,4|cut -d"." -f1|tr '_' ' '|sort > ${SETS_DONE_FILE}
 fi
 
-comm -23 ${SETS_FILE}.1 ${SETS_FILE}.2 |tr ' ' '\t' > ${SETS_FILE}
+comm -23 ${SETS_ALL_FILE} ${SETS_DONE_FILE} |tr ' ' '\t' > ${SETS_TODO_FILE}
 
 if [[ -e $DATAFILE_FILE ]];
 then
@@ -196,6 +222,8 @@ else
     echo Reusing batch file ${OUTPUT_DIR}/${PIPELINE_TAG}/Batch_data.h5
 fi
 
+exit 1
+
 # Run in parallel 
 parallel  \
     --no-run-if-empty \
@@ -206,7 +234,7 @@ parallel  \
     --eta \
     --progress \
     --joblog ${LOG_FILE} \
-    -a ${SETS_FILE} \
+    -a ${SETS_TODO_FILE} \
     --colsep '\t' \
     docker run \
     --rm \
